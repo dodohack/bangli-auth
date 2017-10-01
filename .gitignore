@@ -1,0 +1,9 @@
+/vendor
+.env
+.idea
+database/*.mwb.bak
+bootstrap/cache
+storage/framework/cache
+storage/framework/sessions
+composer.lock
+.DS_Store
