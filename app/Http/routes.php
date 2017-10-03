@@ -25,9 +25,9 @@ $router->post('/register',        'AuthController@postRegister');
 $router->post('/invalidateTokens', 'AuthController@postInvalidateTokens');
 
 
-/* Logged in user routes */
+/* Logged in user routes(guarded by Middleware\Authenticate */
 $router->group(['middleware' => 'auth:api',
-             'namespace'  => 'App\Http\Controllers'], function($router)
+             'namespace'  => '\App\Http\Controllers'], function($router)
 {
     /* Refresh token, expired JWT can be refreshed if still in refresh_ttl period */
     $router->post('/refresh',         'AuthController@postRefresh');
@@ -49,7 +49,7 @@ $router->group(['middleware' => 'auth:api',
 
 /* Super user routes */
 $router->group(['middleware' => 'superuser',
-             'namespace'  => 'App\Http\Controllers'], function($router)
+             'namespace'  => '\App\Http\Controllers'], function($router)
 {
     /* Update user */
     $router->put('/user/{uuid}',      'UserController@putUser');
