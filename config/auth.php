@@ -17,7 +17,9 @@ return [
     */
 
     'defaults' => [
-        'guard' => env('AUTH_GUARD', 'api'),
+        // This set the 'api' guard to be the default guard.
+        'guard' => 'api',
+        'passwords' => 'users',
     ],
 
     /*
@@ -38,6 +40,7 @@ return [
     */
 
     'guards' => [
+        // This config enables the 'api' guard to use 'jwt' driver
         'api' => [
             'driver' => 'jwt',
             'provider' => 'users'

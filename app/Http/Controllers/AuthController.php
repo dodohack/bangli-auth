@@ -9,9 +9,8 @@ namespace App\Http\Controllers;
 
 use GuzzleHttp\Exception\ServerException;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Response;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
-use Tymon\JWTAuth\JWTAuth;
 use Tymon\JWTAuth\Exceptions\JWTException;
 use Tymon\JWTAuth\Exceptions\TokenExpiredException;
 use GuzzleHttp\Client;
@@ -21,14 +20,9 @@ use App\PasswordHash;
 
 class AuthController extends Controller
 {
-    /**
-     * @var \Tymon\JWTAuth\JWTAuth
-     */
-    protected $jwt;
-
-    public function __construct(JWTAuth $jwt)
+    public function __construct()
     {
-        $this->jwt = $jwt;
+        $this->middleware('auth:api', ['except' => 'postLogin']);
     }
 
     /**
@@ -38,33 +32,27 @@ class AuthController extends Controller
      */
     public function postLogin(Request $request)
     {
-        $this->validate($request, [
-            'email'    => 'required|email|max:255',
-            'password' => 'required'
-        ]);
+        /* Grab credentials from the request */
+        $credentials = $request->only('email', 'password');
 
-        /* Grab input from the request */
-        $input = $request->only('email', 'password');
+        /* Verify the credentials and create a token for the user */
+        $token = $this->guard()->attempt($credentials);
 
-        try {
-            /* Verify the credentials and create a token for the user */
-            if (!$token = $this->jwt->attempt($input)) {
-
-                /* Authenticate with Wordpress password hasher */
-                if (!$this->authByWpHasher($input)) {
-                    return response('Wrong email or password', 404);
-                } else {
-                    /* Try to authenticate again and no error should happen */
-                    $token = $this->jwt->attempt($input);
-                }
-            }
-        } catch (JWTException $e) {
-            return response('Can get a token', 500);
+        if (!$token) {
+            // TODO: This authByWpHasher will finally be removed.
+            /* Authenticate with Wordpress password hasher, and convert
+             * wordpress hasher to laravel one. */
+            if (!$this->authByWpHasher($credentials))
+                return response('Wrong email or password', 404);
+            else
+                /* Try to authenticate again and no error should happen */
+                $token = $this->guard()->attempt($credentials);
         }
 
-        $this->jwt->setToken($token);
+        $this->guard()->setToken($token);
+
         // Get domains that user can manage from dashboard
-        $domains = $this->jwt->user()->managedDomains()->get()->toArray();
+        $domains = $this->guard()->user()->managedDomains()->get()->toArray();
         // Return token and domains(if any)
         $json = compact('token', 'domains');
 
@@ -82,12 +70,12 @@ class AuthController extends Controller
         if ($domain) {
             $id = $domain->id;
             // TODO: We can use syncWithoutDetaching() but the function does not exist
-            $rec = $this->jwt->user()->domains()->where('domain_id', $id)->count();
+            $rec = $this->guard()->user()->domains()->where('domain_id', $id)->count();
             // Create user-domain relationship if it is not exists
             if (!$rec)
-                $this->jwt->user()->domains()->attach($id, ['dashboard_user' => 0]);
+                $this->guard()->user()->domains()->attach($id, ['dashboard_user' => 0]);
 
-            $email = $this->jwt->user()->email;
+            $email = $this->guard()->user()->email;
             return response(compact('email'), 200);
         }
 
@@ -106,13 +94,13 @@ class AuthController extends Controller
         ]);
 
         $token = $request->input('token');
-        $this->jwt->setToken($token);
+        $this->guard()->setToken($token);
 
         try {
-            $user = $this->jwt->authenticate();
+            $user = $this->guard()->authenticate();
         } catch (TokenExpiredException $e) {
             // Only refresh token when it is expired
-            $token = $this->jwt->refresh();
+            $token = $this->guard()->refresh();
         } catch (JWTException $e) {
             return response("Unauthorized", 401);
         }
@@ -166,9 +154,9 @@ class AuthController extends Controller
         $uuid     = $request->input('uuid');
         $password = $request->input('password');
 
-        $this->jwt->setToken($token);
+        $this->guard()->setToken($token);
         try {
-            $user = $this->jwt->authenticate();
+            $user = $this->guard()->authenticate();
         } catch (TokenExpiredException $e) {
             return config('status.103'); // Token expired
         } catch (JWTException $e) {
@@ -274,5 +262,14 @@ class AuthController extends Controller
         }
 
         return false;
+    }
+
+    /**
+     * Get the guard to be used during authentication.
+     * @return mixed
+     */
+    private function guard()
+    {
+        return Auth::guard();
     }
 }
