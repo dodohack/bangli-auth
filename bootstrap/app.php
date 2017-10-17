@@ -23,6 +23,10 @@ $app = new Laravel\Lumen\Application(
     realpath(__DIR__.'/../')
 );
 
+// FIXME: Workaround for bug introduced in lumen 5.5.15:
+// https://github.com/laravel/framework/issues/21697
+$app->configure('view');
+
 $app->withFacades();
 
 $app->withEloquent();
